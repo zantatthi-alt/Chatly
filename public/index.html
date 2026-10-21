@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chatly</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ========== AUTH ========== -->
+  <section id="auth" class="auth hidden">
+    <div class="auth-card">
+      <div class="auth-top">
+        <div class="logo">💬 Chatly</div>
+        <select class="lang-select" id="authLang" aria-label="Language"></select>
+      </div>
+      <p class="muted" data-i18n="tagline"></p>
+      <div class="tabs">
+        <button class="tab active" data-mode="login" data-i18n="login"></button>
+        <button class="tab" data-mode="signup" data-i18n="signup"></button>
+      </div>
+      <form id="authForm" autocomplete="on">
+        <label><span data-i18n="username"></span>
+          <input name="username" required autocomplete="username" maxlength="20">
+          <small class="muted signup-only" data-i18n="usernameHint"></small>
+        </label>
+        <label class="signup-only"><span data-i18n="displayName"></span>
+          <input name="displayName" maxlength="30">
+        </label>
+        <label><span data-i18n="password"></span>
+          <input name="password" type="password" required autocomplete="current-password">
+        </label>
+        <div class="error" id="authError"></div>
+        <button class="btn primary wide" id="authSubmit" data-i18n="login"></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== APP ========== -->
+  <section id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="me">
+        <button class="me-btn" id="openProfile" data-i18n-title="profile">
+          <span class="avatar" id="meAvatar"></span>
+          <span class="me-name"><b id="meName"></b><small class="muted" id="meUser"></small></span>
+        </button>
+        <button class="icon-btn" id="logout" data-i18n-title="logout">🚪</button>
+      </div>
+      <div class="tabs side-tabs">
+        <button class="tab active" data-side="chats"><span data-i18n="chats"></span></button>
+        <button class="tab" data-side="friends"><span data-i18n="friends"></span> <span class="badge hidden" id="reqBadge"></span></button>
+      </div>
+
+      <div class="side-panel" id="panel-chats">
+        <button class="btn primary wide" id="newGroupBtn">＋ <span data-i18n="newGroup"></span></button>
+        <ul class="list" id="roomList"></ul>
+        <p class="muted empty" id="noChats" data-i18n="noChats"></p>
+        <h4 class="section-title" id="discoverTitle" data-i18n="discover"></h4>
+        <ul class="list" id="publicList"></ul>
+      </div>
+
+      <div class="side-panel hidden" id="panel-friends">
+        <form class="row" id="addFriendForm">
+          <input id="addFriendInput" data-i18n-ph="addFriendPlaceholder" autocomplete="off">
+          <button class="btn primary" data-i18n="addFriend"></button>
+        </form>
+        <div class="note" id="friendNote"></div>
+        <h4 class="section-title" id="reqTitle" data-i18n="requests"></h4>
+        <ul class="list" id="requestList"></ul>
+        <h4 class="section-title" data-i18n="friends"></h4>
+        <ul class="list" id="friendList"></ul>
+        <p class="muted empty" id="noFriends" data-i18n="noFriends"></p>
+      </div>
+    </aside>
+
+    <main class="chat" id="chat">
+      <div class="placeholder" id="placeholder">
+        <div class="big">💬</div>
+        <p data-i18n="selectChat"></p>
+      </div>
+      <div class="chat-inner hidden" id="chatInner">
+        <header class="chat-head">
+          <button class="icon-btn back" id="backBtn" data-i18n-title="back">←</button>
+          <span class="avatar" id="chatAvatar"></span>
+          <div class="chat-title"><b id="chatName"></b><small class="muted" id="chatSub"></small></div>
+          <button class="btn" id="addMemberBtn" data-i18n="addMember"></button>
+          <button class="btn danger" id="leaveBtn" data-i18n="leaveGroup"></button>
+        </header>
+        <div class="messages" id="messages"></div>
+        <div class="typing muted" id="typing"></div>
+        <form class="composer" id="composer">
+          <button type="button" class="icon-btn" id="emojiBtn" aria-label="Emoji">😊</button>
+          <textarea id="msgInput" rows="1" data-i18n-ph="typeMessage"></textarea>
+          <button class="btn primary" data-i18n="send"></button>
+          <div class="emoji-picker hidden" id="emojiPicker">
+            <div class="emoji-cats" id="emojiCats"></div>
+            <div class="emoji-grid" id="emojiGrid"></div>
+          </div>
+        </form>
+      </div>
+    </main>
+  </section>
+
+  <!-- ========== MODALS ========== -->
+  <div class="modal hidden" id="profileModal">
+    <div class="modal-card">
+      <h3 data-i18n="profile"></h3>
+      <div class="profile-pic">
+        <span class="avatar xl" id="profileAvatar"></span>
+        <div class="col">
+          <label class="btn"><span data-i18n="changePhoto"></span><input type="file" id="avatarFile" accept="image/*" hidden></label>
+          <button class="btn" id="removeAvatar" data-i18n="removePhoto"></button>
+        </div>
+      </div>
+      <label><span data-i18n="displayName"></span><input id="profileName" maxlength="30"></label>
+      <label><span data-i18n="language"></span><select class="lang-select" id="profileLang"></select></label>
+      <div class="error" id="profileError"></div>
+      <div class="modal-actions">
+        <button class="btn" data-close data-i18n="cancel"></button>
+        <button class="btn primary" id="saveProfile" data-i18n="save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="groupModal">
+    <div class="modal-card">
+      <h3 data-i18n="newGroup"></h3>
+      <label><span data-i18n="groupName"></span><input id="groupName" maxlength="40"></label>
+      <label class="check"><input type="checkbox" id="groupPublic"> <span><b data-i18n="publicGroup"></b><br><small class="muted" data-i18n="publicHint"></small></span></label>
+      <h4 class="section-title" data-i18n="selectFriends"></h4>
+      <ul class="list pick" id="groupFriends"></ul>
+      <div class="error" id="groupError"></div>
+      <div class="modal-actions">
+        <button class="btn" data-close data-i18n="cancel"></button>
+        <button class="btn primary" id="createGroup" data-i18n="create"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="addMemberModal">
+    <div class="modal-card">
+      <h3 data-i18n="addMember"></h3>
+      <ul class="list" id="addMemberList"></ul>
+      <div class="modal-actions"><button class="btn" data-close data-i18n="close"></button></div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="confirmModal">
+    <div class="modal-card">
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <button class="btn" id="confirmCancel" data-i18n="cancel"></button>
+        <button class="btn danger" id="confirmOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="i18n.js"></script>
+  <script src="emoji.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
