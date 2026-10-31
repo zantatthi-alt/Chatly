@@ -7,7 +7,12 @@ Real-time web chat: accounts, profile pictures, friends, group chats, 6 language
     npm install
     npm start
 
-Then open http://localhost:3000. Data is saved in `data/db.json`.
+Then open http://localhost:3000. Without a database, data is saved in `data/db.json`.
+
+## Saving data permanently
+Set `DATABASE_URL` to a PostgreSQL connection string (for example a free database from
+https://neon.tech). Accounts, logins, chats and all messages are then stored there and
+survive restarts. Tables are created automatically on first start.
 
 ## Features
 - Sign up / log in (passwords hashed with scrypt). You must be logged in to chat.
@@ -22,7 +27,8 @@ Then open http://localhost:3000. Data is saved in `data/db.json`.
 1. Sign in to https://render.com with GitHub.
 2. New > Blueprint > pick this repo > Deploy. `render.yaml` has the settings.
 
-Note: on the free plan the `data/db.json` file is wiped when the server restarts.
+3. In the service's **Environment** tab, add `DATABASE_URL` (see above). Without it,
+   everything is wiped whenever the free server restarts.
 
 ## Offline preview
 `node preview/build.js` builds `preview/chatly-preview.html`, a single file that runs

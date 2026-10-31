@@ -1,30 +1,22 @@
 const express = require('express');
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'data', 'db.json');
+const store = require('./storage');
 
-// ---------- tiny JSON "database" ----------
+// all data lives in memory while running; storage.js saves it (database or file)
 let db = { users: {}, sessions: {}, rooms: {} };
-if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-let saveTimer = null;
-function save() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-    fs.writeFileSync(DB_FILE, JSON.stringify(db));
-  }, 300);
-}
+const save = () => store.save();
 
 const id = () => crypto.randomBytes(8).toString('hex');
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 64).toString('hex');
 const LANGS = ['en', 'es', 'fr', 'ja', 'th', 'zh'];
 const MAX_AVATAR = 300 * 1024;
-const MAX_HISTORY = 500;
+const MAX_HISTORY = store.KEEP_IN_MEMORY;
+const PAGE = 100; // messages sent to the browser at a time
 
 function publicUser(u) {
   return { username: u.username, displayName: u.displayName, avatar: u.avatar, online: online.has(u.username) };
@@ -252,10 +244,21 @@ io.on('connection', socket => {
     ack(cb, { ok: true });
   });
 
-  socket.on('room:history', ({ roomId } = {}, cb) => {
+  // newest messages, or with `before` (a timestamp) the ones just older than that
+  socket.on('room:history', async ({ roomId, before } = {}, cb) => {
     const room = db.rooms[roomId];
     if (!room || !room.members.includes(me)) return ack(cb, { error: 'noRoom' });
-    ack(cb, { messages: room.messages.slice(-200) });
+    const until = typeof before === 'number' ? before : Infinity;
+    let messages = room.messages.filter(m => m.ts < until).slice(-PAGE);
+    if (messages.length < PAGE && store.olderMessages) {
+      const oldestInMemory = room.messages.length ? room.messages[0].ts : until;
+      try {
+        messages = [...await store.olderMessages(room.id, Math.min(until, oldestInMemory), PAGE - messages.length), ...messages];
+      } catch (e) {
+        console.error('Loading old messages failed:', e.message);
+      }
+    }
+    ack(cb, { messages, more: messages.length === PAGE });
   });
 
   socket.on('msg:send', ({ roomId, text } = {}, cb) => {
@@ -304,4 +307,19 @@ function systemMessage(room, kind, actor, target) {
   pushMessage(room, { id: id(), system: kind, from: actor, target: target || null, ts: Date.now(), reactions: {} });
 }
 
-server.listen(PORT, () => console.log(`Web chat running on http://localhost:${PORT}`));
+// save everything before the server is stopped (Render does this on every deploy)
+async function shutdown() {
+  try { await store.flush(); } catch (e) { console.error('Final save failed:', e.message); }
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+store.load().then(data => {
+  db = data;
+  console.log(process.env.DATABASE_URL ? 'Using the database (DATABASE_URL)' : 'Saving to data/db.json');
+  server.listen(PORT, () => console.log(`Web chat running on http://localhost:${PORT}`));
+}).catch(e => {
+  console.error('Could not load saved data:', e.message);
+  process.exit(1);
+});

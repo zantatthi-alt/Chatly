@@ -10,6 +10,7 @@ let token = null, socket = null;
 let state = { me: null, friends: [], requests: [], rooms: [], publicRooms: [] };
 let currentRoom = null;
 let messages = [];          // messages of the open room
+let hasOlder = false;       // server has older messages for the open room
 const unread = {};          // roomId -> count
 let authMode = 'login';
 let pendingAvatar;          // undefined = unchanged, null = remove, string = new data URL
@@ -281,6 +282,7 @@ async function openRoom(roomId) {
   const res = await emit('room:history', { roomId });
   if (currentRoom !== roomId) return;
   messages = res.messages || [];
+  hasOlder = !!res.more;
   renderMessages(true);
   $('#msgInput').focus();
 }
@@ -318,6 +320,11 @@ function renderMessages(scrollToEnd) {
   const box = $('#messages');
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   box.innerHTML = '';
+  if (hasOlder) {
+    const more = el('button', 'btn small load-older', t('loadOlder'));
+    more.onclick = loadOlder;
+    box.append(more);
+  }
   const room = state.rooms.find(r => r.id === currentRoom);
   let prev = null;
   for (const m of messages) {
@@ -353,6 +360,19 @@ function renderMessages(scrollToEnd) {
     prev = m;
   }
   if (scrollToEnd || atBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function loadOlder() {
+  if (!messages.length) return;
+  const roomId = currentRoom, box = $('#messages');
+  const res = await emit('room:history', { roomId, before: messages[0].ts });
+  if (roomId !== currentRoom) return;
+  hasOlder = !!res.more;
+  // keep the view where it was while adding messages above it
+  const fromBottom = box.scrollHeight - box.scrollTop;
+  messages = [...(res.messages || []), ...messages];
+  renderMessages(false);
+  box.scrollTop = box.scrollHeight - fromBottom;
 }
 
 function showReactBar(row, m) {

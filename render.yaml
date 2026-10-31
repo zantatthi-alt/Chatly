@@ -6,3 +6,8 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    envVars:
+      # Connection string of a PostgreSQL database (e.g. a free one from neon.tech).
+      # Without it, accounts and messages are lost whenever the server restarts.
+      - key: DATABASE_URL
+        sync: false
