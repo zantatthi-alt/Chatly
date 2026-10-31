@@ -150,5 +150,20 @@ function pgStore(url) {
   };
 }
 
-module.exports = process.env.DATABASE_URL ? pgStore(process.env.DATABASE_URL) : fileStore();
+// Find the database setting even if it was pasted with small mistakes:
+// spaces or invisible characters in the name, quotes or a "psql" prefix around the value.
+function findDatabaseUrl() {
+  const key = Object.keys(process.env).find(k => k.replace(/[^A-Za-z_]/g, '').toUpperCase() === 'DATABASE_URL');
+  if (!key) return { url: null, note: 'No DATABASE_URL setting found.' };
+  let url = String(process.env[key]).trim().replace(/^psql\s+/, '').replace(/^DATABASE_URL\s*=\s*/i, '').replace(/^['"]|['"]$/g, '').trim();
+  const name = JSON.stringify(key);
+  if (!url) return { url: null, note: `Found setting ${name} but its value is empty.` };
+  if (!/^postgres(ql)?:\/\//.test(url)) return { url: null, note: `Found setting ${name} but its value does not start with postgresql:// (it is ${url.length} characters long).` };
+  return { url, note: `Found setting ${name}.` };
+}
+
+const found = findDatabaseUrl();
+console.log(found.note);
+module.exports = found.url ? pgStore(found.url) : fileStore();
+module.exports.usingDatabase = !!found.url;
 module.exports.KEEP_IN_MEMORY = KEEP_IN_MEMORY;

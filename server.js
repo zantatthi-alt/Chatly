@@ -317,7 +317,7 @@ process.on('SIGINT', shutdown);
 
 store.load().then(data => {
   db = data;
-  console.log(process.env.DATABASE_URL ? 'Using the database (DATABASE_URL)' : 'Saving to data/db.json');
+  console.log(store.usingDatabase ? 'Using the database (DATABASE_URL)' : 'Saving to data/db.json');
   server.listen(PORT, () => console.log(`Web chat running on http://localhost:${PORT}`));
 }).catch(e => {
   console.error('Could not load saved data:', e.message);
