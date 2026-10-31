@@ -15,6 +15,7 @@ const id = () => crypto.randomBytes(8).toString('hex');
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 64).toString('hex');
 const LANGS = ['en', 'es', 'fr', 'ja', 'th', 'zh'];
 const MAX_AVATAR = 300 * 1024;
+const TEXT_SIZES = [0.9, 1, 1.15, 1.3, 1.5];
 const MAX_HISTORY = store.KEEP_IN_MEMORY;
 const PAGE = 100; // messages sent to the browser at a time
 
@@ -88,7 +89,7 @@ function sendState(username) {
   const u = db.users[username];
   if (!u) return;
   io.to('user:' + username).emit('state', {
-    me: { ...publicUser(u), lang: u.lang },
+    me: { ...publicUser(u), lang: u.lang, textSize: u.textSize || 1 },
     friends: u.friends.map(f => db.users[f]).filter(Boolean).map(publicUser),
     requests: u.requests.map(f => db.users[f]).filter(Boolean).map(publicUser),
     rooms: Object.values(db.rooms).filter(r => r.members.includes(username)).map(roomView),
@@ -114,7 +115,7 @@ io.on('connection', socket => {
 
   const ack = (cb, data) => typeof cb === 'function' && cb(data);
 
-  socket.on('profile:update', ({ displayName, avatar, lang } = {}, cb) => {
+  socket.on('profile:update', ({ displayName, avatar, lang, textSize } = {}, cb) => {
     const u = db.users[me];
     if (typeof displayName === 'string' && displayName.trim()) u.displayName = displayName.trim().slice(0, 30);
     if (avatar === null) u.avatar = null;
@@ -123,6 +124,7 @@ io.on('connection', socket => {
       u.avatar = avatar;
     }
     if (LANGS.includes(lang)) u.lang = lang;
+    if (TEXT_SIZES.includes(textSize)) u.textSize = textSize;
     save();
     sendState(me);
     sendStateAll(u.friends);

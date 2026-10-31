@@ -19,6 +19,13 @@ try { token = localStorage.getItem('token'); } catch (e) {}
 let savedLang = 'en';
 try { savedLang = localStorage.getItem('lang') || (navigator.language || 'en').slice(0, 2); } catch (e) {}
 
+// ---------- text size (also remembered on this device so the login page uses it) ----------
+function applyTextSize(size) {
+  document.documentElement.style.setProperty('--text-scale', size);
+  try { localStorage.setItem('textSize', size); } catch (e) {}
+}
+try { const saved = localStorage.getItem('textSize'); if (saved) applyTextSize(saved); } catch (e) {}
+
 // ---------- language selects ----------
 document.querySelectorAll('.lang-select').forEach(sel => {
   for (const code in LANGUAGES) sel.append(new Option(LANGUAGES[code], code));
@@ -85,6 +92,7 @@ function connect() {
     const first = !state.me;
     state = s;
     if (first || s.me.lang !== currentLang) setLang(s.me.lang);
+    applyTextSize(s.me.textSize);
     $('#auth').classList.add('hidden');
     $('#app').classList.remove('hidden');
     if (currentRoom && !s.rooms.find(r => r.id === currentRoom)) closeRoom();
@@ -466,6 +474,7 @@ $('#openProfile').onclick = () => {
   $('#profileAvatar').replaceWith(Object.assign(avatar(state.me, 'xl'), { id: 'profileAvatar' }));
   $('#profileName').value = state.me.displayName;
   $('#profileLang').value = currentLang;
+  $('#profileTextSize').value = String(state.me.textSize);
   showError('#profileError');
   openModal('#profileModal');
 };
@@ -492,7 +501,7 @@ $('#removeAvatar').onclick = () => {
   $('#profileAvatar').replaceWith(Object.assign(avatar({ ...state.me, avatar: null, online: false }, 'xl'), { id: 'profileAvatar' }));
 };
 $('#saveProfile').onclick = async () => {
-  const data = { displayName: $('#profileName').value, lang: $('#profileLang').value };
+  const data = { displayName: $('#profileName').value, lang: $('#profileLang').value, textSize: Number($('#profileTextSize').value) };
   if (pendingAvatar !== undefined) data.avatar = pendingAvatar;
   const res = await emit('profile:update', data);
   if (res.error) return showError('#profileError', res.error);

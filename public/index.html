@@ -83,15 +83,15 @@
           <button class="icon-btn back" id="backBtn" data-i18n-title="back">←</button>
           <span class="avatar" id="chatAvatar"></span>
           <div class="chat-title"><b id="chatName"></b><small class="muted" id="chatSub"></small></div>
-          <button class="btn" id="addMemberBtn" data-i18n="addMember"></button>
-          <button class="btn danger" id="leaveBtn" data-i18n="leaveGroup"></button>
+          <button class="btn" id="addMemberBtn" data-i18n-title="addMember"><span aria-hidden="true">＋</span><span class="label" data-i18n="addMember"></span></button>
+          <button class="btn danger" id="leaveBtn" data-i18n-title="leaveGroup"><span aria-hidden="true">↩</span><span class="label" data-i18n="leaveGroup"></span></button>
         </header>
         <div class="messages" id="messages"></div>
         <div class="typing muted" id="typing"></div>
         <form class="composer" id="composer">
           <button type="button" class="icon-btn" id="emojiBtn" aria-label="Emoji">😊</button>
           <textarea id="msgInput" rows="1" data-i18n-ph="typeMessage"></textarea>
-          <button class="btn primary" data-i18n="send"></button>
+          <button class="btn primary send-btn" data-i18n-title="send"><span class="icon" aria-hidden="true">➤</span><span class="label" data-i18n="send"></span></button>
           <div class="emoji-picker hidden" id="emojiPicker">
             <div class="emoji-cats" id="emojiCats"></div>
             <div class="emoji-grid" id="emojiGrid"></div>
@@ -114,6 +114,15 @@
       </div>
       <label><span data-i18n="displayName"></span><input id="profileName" maxlength="30"></label>
       <label><span data-i18n="language"></span><select class="lang-select" id="profileLang"></select></label>
+      <label><span data-i18n="textSize"></span>
+        <select id="profileTextSize">
+          <option value="0.9" data-i18n="sizeSmall"></option>
+          <option value="1" data-i18n="sizeNormal"></option>
+          <option value="1.15" data-i18n="sizeLarge"></option>
+          <option value="1.3" data-i18n="sizeXL"></option>
+          <option value="1.5" data-i18n="sizeHuge"></option>
+        </select>
+      </label>
       <div class="error" id="profileError"></div>
       <div class="modal-actions">
         <button class="btn" data-close data-i18n="cancel"></button>
