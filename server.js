@@ -6,6 +6,8 @@ const { Server } = require('socket.io');
 
 const PORT = process.env.PORT || 3000;
 const store = require('./storage');
+const setupPush = require('./push');
+let push; // notifications, set up once the saved data is loaded
 
 // all data lives in memory while running; storage.js saves it (database or file)
 let db = { users: {}, sessions: {}, rooms: {} };
@@ -115,6 +117,13 @@ io.on('connection', socket => {
 
   const ack = (cb, data) => typeof cb === 'function' && cb(data);
 
+  // notifications: devices subscribe here; the app reports when it is on screen
+  // so we don't buzz a phone while the person is already reading the chat
+  socket.on('push:key', (_, cb) => ack(cb, { key: push.publicKey }));
+  socket.on('push:subscribe', ({ subscription } = {}, cb) => ack(cb, push.subscribe(me, subscription) ? { ok: true } : { error: 'badSubscription' }));
+  socket.on('push:unsubscribe', ({ endpoint } = {}, cb) => { push.unsubscribe(me, endpoint); ack(cb, { ok: true }); });
+  socket.on('visible', visible => push.setVisible(me, socket.id, !!visible));
+
   socket.on('profile:update', ({ displayName, avatar, lang, textSize } = {}, cb) => {
     const u = db.users[me];
     if (typeof displayName === 'string' && displayName.trim()) u.displayName = displayName.trim().slice(0, 30);
@@ -139,7 +148,10 @@ io.on('connection', socket => {
     if (u.friends.includes(name)) return ack(cb, { error: 'alreadyFriends' });
     // they already asked us -> just become friends
     if (u.requests.includes(name)) return acceptFriend(name, cb);
-    if (!them.requests.includes(me)) them.requests.push(me);
+    if (!them.requests.includes(me)) {
+      them.requests.push(me);
+      push.notifyFriendRequest(name, me);
+    }
     save();
     sendState(name);
     ack(cb, { ok: true });
@@ -291,6 +303,7 @@ io.on('connection', socket => {
   });
 
   socket.on('disconnect', () => {
+    push.setVisible(me, socket.id, false);
     const n = (online.get(me) || 1) - 1;
     if (n <= 0) online.delete(me); else online.set(me, n);
     if (n <= 0) sendStateAll(db.users[me] ? db.users[me].friends : []);
@@ -302,6 +315,7 @@ function pushMessage(room, msg) {
   if (room.messages.length > MAX_HISTORY) room.messages.splice(0, room.messages.length - MAX_HISTORY);
   save();
   io.to('room:' + room.id).emit('msg:new', { roomId: room.id, msg });
+  push.notifyMessage(room, msg);
 }
 
 // system messages are stored as keys so each user sees them in their own language
@@ -319,6 +333,7 @@ process.on('SIGINT', shutdown);
 
 store.load().then(data => {
   db = data;
+  push = setupPush(db, save);
   console.log(store.usingDatabase ? 'Using the database (DATABASE_URL)' : 'Saving to data/db.json');
   server.listen(PORT, () => console.log(`Web chat running on http://localhost:${PORT}`));
 }).catch(e => {

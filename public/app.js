@@ -67,6 +67,8 @@ function showAuth() {
 }
 
 $('#logout').onclick = async () => {
+  const sub = await currentSub().catch(() => null);
+  if (sub && socket) await emit('push:unsubscribe', { endpoint: sub.endpoint });
   await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
   try { localStorage.removeItem('token'); } catch (e) {}
   token = null;
@@ -80,6 +82,7 @@ $('#logout').onclick = async () => {
 function connect() {
   if (socket) socket.disconnect();
   socket = io({ auth: { token } });
+  socket.on('connect', () => socket.emit('visible', document.visibilityState === 'visible'));
   socket.on('connect_error', err => {
     if (err.message === 'unauthorized') {
       try { localStorage.removeItem('token'); } catch (e) {}
@@ -97,6 +100,7 @@ function connect() {
     $('#app').classList.remove('hidden');
     if (currentRoom && !s.rooms.find(r => r.id === currentRoom)) closeRoom();
     renderAll();
+    if (first) { syncPush(); updateBanners(); handleLink(pendingLink); pendingLink = null; }
   });
   socket.on('msg:new', ({ roomId, msg }) => {
     const room = state.rooms.find(r => r.id === roomId);
@@ -184,6 +188,8 @@ function renderAll() {
 }
 
 function renderRooms() {
+  const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0);
+  if (navigator.setAppBadge) (totalUnread ? navigator.setAppBadge(totalUnread) : navigator.clearAppBadge()).catch(() => {});
   const list = $('#roomList');
   list.innerHTML = '';
   const rooms = [...state.rooms].sort((a, b) => ((b.last && b.last.ts) || 0) - ((a.last && a.last.ts) || 0));
@@ -280,6 +286,7 @@ $('#addFriendForm').onsubmit = async e => {
 async function openRoom(roomId) {
   currentRoom = roomId;
   unread[roomId] = 0;
+  if (swReg) swReg.getNotifications({ tag: 'room-' + roomId }).then(ns => ns.forEach(n => n.close())).catch(() => {});
   $('#placeholder').classList.add('hidden');
   $('#chatInner').classList.remove('hidden');
   $('#app').classList.add('in-chat');
@@ -563,6 +570,122 @@ $('#leaveBtn').onclick = async () => {
   const id = currentRoom;
   closeRoom();
   await emit('group:leave', { roomId: id });
+};
+
+// ---------- installable app + notifications ----------
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isInstalled = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let swReg = null, installEvent = null, pushOn = false;
+let pendingLink = new URL(location.href);   // ?room=… or ?tab=friends from a notification
+
+const isDismissed = k => { try { return localStorage.getItem('dismiss-' + k) === '1'; } catch (e) { return false; } };
+document.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
+  try { localStorage.setItem('dismiss-' + b.dataset.dismiss, '1'); } catch (e) {}
+  updateBanners();
+});
+
+let toastTimer;
+function toast(text) {
+  $('#toast').textContent = text;
+  $('#toast').classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), 4000);
+}
+
+function updateBanners() {
+  const loggedIn = !!state.me;
+  $('#installBanner').classList.toggle('hidden', !(loggedIn && installEvent && !isDismissed('install')));
+  $('#iosBanner').classList.toggle('hidden', !(loggedIn && isIOS && !isInstalled && !isDismissed('ios')));
+  // on iPhone/iPad notifications only work once Chatly is on the Home Screen, so show the install steps first
+  const iosNotInstalled = isIOS && !isInstalled;
+  $('#notifBanner').classList.toggle('hidden', !(loggedIn && !iosNotInstalled && pushSupported && Notification.permission === 'default' && !isDismissed('notif')));
+  $('#notifBtn').textContent = pushOn ? '🔔' : '🔕';
+  $('#notifBtn').title = t(pushOn ? 'notifOn' : 'notifOff');
+}
+
+function handleLink(url) {
+  if (!url || !state.me) return;
+  const room = url.searchParams.get('room');
+  if (room && state.rooms.some(r => r.id === room)) { switchSide('chats'); openRoom(room); }
+  if (url.searchParams.get('tab') === 'friends') switchSide('friends');
+  if (location.search) history.replaceState(null, '', '/');
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(reg => { swReg = reg; syncPush(); }).catch(() => {});
+  // a notification was tapped while the app was already open
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'open') handleLink(new URL(e.data.url, location.origin));
+  });
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; updateBanners(); });
+addEventListener('appinstalled', () => { installEvent = null; updateBanners(); });
+$('#installBtn').onclick = async () => {
+  if (!installEvent) return;
+  installEvent.prompt();
+  await installEvent.userChoice.catch(() => {});
+  installEvent = null;
+  updateBanners();
+};
+
+document.addEventListener('visibilitychange', () => {
+  if (socket) socket.emit('visible', document.visibilityState === 'visible');
+});
+
+const keyBytes = b64 => {
+  const raw = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+};
+const sameKey = (a, b) => a && b && a.byteLength === b.byteLength && new Uint8Array(a).every((x, i) => x === b[i]);
+
+async function currentSub() {
+  return swReg ? swReg.pushManager.getSubscription() : null;
+}
+
+// make sure this device is subscribed and the server knows it belongs to the logged-in user
+async function syncPush() {
+  pushOn = false;
+  try {
+    if (!socket || !state.me || !swReg || !pushSupported || Notification.permission !== 'granted') return;
+    const { key } = await emit('push:key');
+    let sub = await currentSub();
+    if (sub && !sameKey(sub.options.applicationServerKey, keyBytes(key))) { await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+    const res = await emit('push:subscribe', { subscription: sub.toJSON() });
+    pushOn = !!res.ok;
+  } catch (e) {
+    console.warn('Notifications not available:', e);
+  } finally {
+    updateBanners();
+  }
+}
+
+async function turnOnNotifications() {
+  if (isIOS && !isInstalled) return toast(t('iosNeedsInstall'));
+  if (!pushSupported) return toast(t('notifUnsupported'));
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') { updateBanners(); return toast(t('notifBlocked')); }
+  if (!swReg) swReg = await navigator.serviceWorker.ready;
+  await syncPush();
+  toast(t(pushOn ? 'notifTurnedOn' : 'notifUnsupported'));
+}
+
+async function turnOffNotifications() {
+  const sub = await currentSub().catch(() => null);
+  if (sub) {
+    await emit('push:unsubscribe', { endpoint: sub.endpoint });
+    await sub.unsubscribe().catch(() => {});
+  }
+  pushOn = false;
+  updateBanners();
+  toast(t('notifOff'));
+}
+
+$('#notifTurnOn').onclick = turnOnNotifications;
+$('#notifBtn').onclick = async () => {
+  if (!pushOn) return turnOnNotifications();
+  if (await askConfirm(t('notifOffConfirm'))) turnOffNotifications();
 };
 
 // ---------- start ----------

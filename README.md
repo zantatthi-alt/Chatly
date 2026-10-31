@@ -2,6 +2,15 @@
 
 Real-time web chat: accounts, profile pictures, friends, group chats, 6 languages, emoji.
 
+## Install as an app + notifications
+Chatly is an installable web app (PWA). It works in any browser, and can also be installed:
+- **Android / Chrome / Edge:** tap "Install app" in Chatly, or the browser menu > Install app.
+- **iPhone / iPad (iOS 16.4+):** Safari > Share > Add to Home Screen, then open it from the Home Screen.
+
+Tap 🔔 to get notifications for new messages and friend requests. A device is not notified while
+Chatly is open on screen for that person. The signing keys are created automatically and saved
+with the rest of the data, so there is nothing to configure.
+
 ## Run it
 
     npm install

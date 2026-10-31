@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Chatly</title>
+  <meta name="description" content="Chat with friends and groups, in your language.">
+  <meta name="theme-color" content="#5b5bf0">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Chatly">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -44,6 +53,7 @@
           <span class="avatar" id="meAvatar"></span>
           <span class="me-name"><b id="meName"></b><small class="muted" id="meUser"></small></span>
         </button>
+        <button class="icon-btn" id="notifBtn" data-i18n-title="notifications">🔕</button>
         <button class="icon-btn" id="logout" data-i18n-title="logout">🚪</button>
       </div>
       <div class="tabs side-tabs">
@@ -52,6 +62,38 @@
       </div>
 
       <div class="side-panel" id="panel-chats">
+        <div class="banner hidden" id="installBanner">
+          <img src="/icons/icon-192.png" alt="" width="40" height="40">
+          <div class="banner-body">
+            <p data-i18n="installPrompt"></p>
+            <div class="banner-actions">
+              <button class="btn small" data-dismiss="install" data-i18n="notNow"></button>
+              <button class="btn small primary" id="installBtn" data-i18n="installApp"></button>
+            </div>
+          </div>
+        </div>
+        <div class="banner hidden" id="iosBanner">
+          <img src="/icons/icon-192.png" alt="" width="40" height="40">
+          <div class="banner-body">
+            <p><b data-i18n="installApp"></b></p>
+            <ol class="steps">
+              <li><span data-i18n="iosStep1"></span> <span class="share-icon" aria-hidden="true">⬆︎</span></li>
+              <li data-i18n="iosStep2"></li>
+              <li data-i18n="iosStep3"></li>
+            </ol>
+            <div class="banner-actions"><button class="btn small" data-dismiss="ios" data-i18n="notNow"></button></div>
+          </div>
+        </div>
+        <div class="banner hidden" id="notifBanner">
+          <span class="banner-icon" aria-hidden="true">🔔</span>
+          <div class="banner-body">
+            <p data-i18n="notifPrompt"></p>
+            <div class="banner-actions">
+              <button class="btn small" data-dismiss="notif" data-i18n="notNow"></button>
+              <button class="btn small primary" id="notifTurnOn" data-i18n="turnOn"></button>
+            </div>
+          </div>
+        </div>
         <button class="btn primary wide" id="newGroupBtn">＋ <span data-i18n="newGroup"></span></button>
         <ul class="list" id="roomList"></ul>
         <p class="muted empty" id="noChats" data-i18n="noChats"></p>
@@ -163,6 +205,8 @@
       </div>
     </div>
   </div>
+
+  <div class="toast hidden" id="toast" role="status"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="i18n.js"></script>

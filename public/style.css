@@ -23,6 +23,8 @@ html { font-size: calc(100% * var(--text-scale, 1)); }
 @media (min-width: 1400px) { html { font-size: calc(112.5% * var(--text-scale, 1)); } }
 /* 16px+ in text boxes stops phones from zooming in when you tap them */
 input, select, textarea { font-size: max(16px, 1rem) !important; }
+/* keep content clear of the notch and home bar when installed as an app */
+body { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 body { background: var(--bg); color: var(--text); font: 1rem/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans", "Noto Sans Thai", "Noto Sans JP", sans-serif; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
@@ -151,6 +153,17 @@ small { font-size: 0.8125rem; }
 .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); padding: 0.5rem; height: 15rem; overflow-y: auto; }
 .emoji-grid button { border: 0; background: none; font-size: 1.5rem; padding: 0.25rem 0; cursor: pointer; border-radius: 0.5rem; }
 .emoji-grid button:hover { background: var(--panel-2); }
+
+/* install / notification prompts */
+.banner { display: flex; gap: 0.75rem; align-items: flex-start; background: var(--accent-2); border-radius: 0.875rem; padding: 0.75rem; margin: 0.75rem 0; }
+.banner img { border-radius: 0.625rem; flex: none; width: 2.5rem; height: 2.5rem; }
+.banner-icon { font-size: 1.75rem; line-height: 1; flex: none; }
+.banner-body { flex: 1; min-width: 0; }
+.banner p { margin: 0 0 0.5rem; font-size: 0.875rem; }
+.banner-actions { display: flex; gap: 0.375rem; justify-content: flex-end; flex-wrap: wrap; }
+.steps { margin: 0 0 0.5rem; padding-left: 1.25rem; font-size: 0.875rem; display: grid; gap: 0.25rem; }
+.share-icon { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--panel); color: var(--accent); font-size: 0.875rem; }
+.toast { position: fixed; left: 50%; bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: calc(100vw - 2rem); background: var(--text); color: var(--bg); padding: 0.625rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; z-index: 60; text-align: center; }
 
 /* modals */
 .modal { position: fixed; inset: 0; background: rgba(10,12,20,.45); display: grid; place-items: center; padding: 1rem; z-index: 50; }

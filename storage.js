@@ -15,6 +15,7 @@ function fileStore() {
   return {
     async load() {
       db = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { users: {}, sessions: {}, rooms: {} };
+      db.settings = db.settings || {};
       return db;
     },
     save() {
@@ -34,7 +35,7 @@ function pgStore(url) {
   const pool = new Pool({ connectionString: url, max: 4 });
   let db, timer = null, running = null, again = false;
   // last saved JSON for each row, so we only write what changed
-  const saved = { users: new Map(), sessions: new Map(), rooms: new Map(), messages: new Map() };
+  const saved = { users: new Map(), sessions: new Map(), rooms: new Map(), messages: new Map(), settings: new Map() };
 
   const roomMeta = r => { const { messages, ...meta } = r; return meta; };
 
@@ -48,6 +49,13 @@ function pgStore(url) {
         if (saved.users.get(name) === json) continue;
         await client.query('INSERT INTO users (username, data) VALUES ($1, $2) ON CONFLICT (username) DO UPDATE SET data = EXCLUDED.data', [name, json]);
         saved.users.set(name, json);
+      }
+      // app-wide settings (e.g. the notification keys)
+      for (const [key, value] of Object.entries(db.settings)) {
+        const json = JSON.stringify(value);
+        if (saved.settings.get(key) === json) continue;
+        await client.query('INSERT INTO settings (key, data) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data', [key, json]);
+        saved.settings.set(key, json);
       }
       // sessions (logins)
       for (const [token, name] of Object.entries(db.sessions)) {
@@ -98,8 +106,13 @@ function pgStore(url) {
         CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, data JSONB NOT NULL);
         CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, ts BIGINT NOT NULL, data JSONB NOT NULL);
         CREATE INDEX IF NOT EXISTS messages_room_ts ON messages (room_id, ts);
+        CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, data JSONB NOT NULL);
       `);
-      db = { users: {}, sessions: {}, rooms: {} };
+      db = { users: {}, sessions: {}, rooms: {}, settings: {} };
+      for (const row of (await pool.query('SELECT key, data FROM settings')).rows) {
+        db.settings[row.key] = row.data;
+        saved.settings.set(row.key, JSON.stringify(row.data));
+      }
       for (const row of (await pool.query('SELECT username, data FROM users')).rows) {
         db.users[row.username] = row.data;
         saved.users.set(row.username, JSON.stringify(row.data));
